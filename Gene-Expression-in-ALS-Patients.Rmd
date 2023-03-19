@@ -11,14 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r running_analysis, include=FALSE}
-library(caret)
-library(tidyverse)
-library(ggthemes)
-library(Rtsne)
-library(ggridges)
-library(pbapply)
-library(rpart)
-library(rpart.plot)
+list.of.packages <- c("caret", "tidyverse", "ggthemes", "Rtsne", "ggridges", "pbapply", "rpart", "rpart.plot")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(list.of.packages, require, character.only = TRUE)
 
 ### Control vs Case ###
 ## Importaing Data ##
@@ -148,14 +144,14 @@ filter.train.bvl.genes.sig_diff <- abs(train.bvl.genes.z_test - mean(train.bvl.g
 train.bvl.genes.tsne <- Rtsne(train.bvl.genes[,c(FALSE, filter.train.bvl.genes.sig_diff)])
 train.bvl.genes.tsne$Y <- data.frame(train.bvl.genes.tsne$Y) %>% mutate(SiteOnset_Class = train.bvl.genes$SiteOnset_Class)
 
-plot.train.bvl.genes.tsne <- train.bvl.genes.tsne$Y %>% ggplot(aes(x = X1, y = X2, color = as.factor(SiteOnset_Class))) + geom_point() + labs(color = 'Ctrl = 0, Case = 1')
+plot.train.bvl.genes.tsne <- train.bvl.genes.tsne$Y %>% ggplot(aes(x = X1, y = X2, color = as.factor(SiteOnset_Class))) + geom_point() + labs(color = 'Bulb = 0, Limb = 1')
 plot.train.bvl.genes.tsne
 
 ## PCA ##
 train.bvl.genes.pca <- prcomp(train.bvl.genes[,c(FALSE, filter.train.bvl.genes.sig_diff)], center = TRUE, scale. = TRUE)
 train.bvl.genes.pca$x <- data.frame(train.bvl.genes.pca$x) %>% mutate(SiteOnset_Class = train.bvl.genes$SiteOnset_Class)
 
-plot.train.bvl.genes.pca <- train.bvl.genes.pca$x %>% ggplot(aes(x = PC1, y = PC2, color = as.factor(ifelse(SiteOnset_Class == 1, "Case", "Control")))) + geom_point() + labs(color = "ALS Status") + theme_few() + scale_color_economist() + theme(legend.position = "right")
+plot.train.bvl.genes.pca <- train.bvl.genes.pca$x %>% ggplot(aes(x = PC1, y = PC2, color = as.factor(ifelse(SiteOnset_Class == 1, "Bulb", "Limb")))) + geom_point() + labs(color = "ALS Status") + theme_few() + scale_color_economist() + theme(legend.position = "right")
 plot.train.bvl.genes.pca
 
 ## LDA ##
@@ -178,10 +174,10 @@ bvl.genes$X1 <- apply(bvl.genes[,c(FALSE, filter.train.bvl.genes.sig_diff)], 1, 
 
 lda.cutoff.bvl <- (sum(lda.train.bvl.genes$finalModel$means[1,]*lda.train.bvl.genes$finalModel$scaling) + sum(lda.train.bvl.genes$finalModel$means[2,]*lda.train.bvl.genes$finalModel$scaling))/2
 
-plot.bvl.jitter.lda <- bvl.genes %>% ggplot(aes(x = X1, y = rep(0, times = length(X1)), color = as.factor(ifelse(SiteOnset_Class == 1, "Case", "Control")))) +
+plot.bvl.jitter.lda <- bvl.genes %>% ggplot(aes(x = X1, y = rep(0, times = length(X1)), color = as.factor(ifelse(SiteOnset_Class == 1, "Bulb", "Limb")))) +
   geom_hline(yintercept = - 0.15, color = 'black') +
   geom_density_ridges(jittered_points = TRUE, position = position_raincloud(height = 0.2, ygap = 0.05), fill = '#00000011') +
-  geom_density(inherit.aes = FALSE, mapping = aes(x = X1, y = (..count.. * -1)/max(..count..) - 0.3, color = as.factor(ifelse(SiteOnset_Class == 1, "Case", "Control"))), fill = '#00000011') +
+  geom_density(inherit.aes = FALSE, mapping = aes(x = X1, y = (..count.. * -1)/max(..count..) - 0.3, color = as.factor(ifelse(SiteOnset_Class == 1, "Bulb", "Limb"))), fill = '#00000011') +
   geom_vline(xintercept = lda.cutoff.bvl, color = 'black', linetype = 'dashed') + labs(color = "ALS Status") + theme_few() + scale_color_economist() +
   scale_fill_economist() + theme(legend.position = "top", axis.title.y = element_blank(), axis.ticks.y = element_blank(), axis.text.y = element_blank()) + xlim(min(bvl.genes$X1), max(bvl.genes$X1))
 plot.bvl.jitter.lda
@@ -235,15 +231,15 @@ This project was completed for the *Data Science: Capstone* course in HarvardX's
 
 The methods used for analyzing the control versus case data and the bulbar versus limb onset site data were very similar, so this report will describe their methods simultaneously and later differentiate their results. For each dataset, the patient status was encoded as a binary factor (control versus case or bulbar versus limb) and the expressions of 53,859 genes were provided as normalized transcript counts. The datasets had a similar number of patients, with the control versus case dataset having 163 and the bulbar versus limb onset site dataset having 112. The datasets also provided a patient identification number, but this was not used in the analysis.
 
-The first step in cleaning the data was to remove the columns for any genes whose transcriptions were were recorded, on avereage, fewer than 10 times. These genes were considered as practically not transcribed at all and so not interesing. Next, the patient ID was removed. Than the data was partitioned into training and testing sets to prepare for investigation and model creation.
+The first step in cleaning the data was to remove the columns for any genes whose transcriptions were recorded, on avereage, fewer than 10 times. These genes were considered as practically not transcribed at all and so not interesing. Next, the patient ID was removed. Than the data was partitioned into training and testing sets to prepare for investigation and model creation.
 
 The next step was to investigate for genes which were expressed differently between the two patient status groups. Using the train set, a Z-test was performed on the expression distributions of each gene for the two patient status groups. The Z-test value for two distributions is described by the equation:
 $$
 Z = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\sigma_1^2 + \sigma_2^2}}
 $$
-With low values indicating that the two distributions are similar or identical while high values indicate significant difference between the distribution means. These Z-test values were used to filter the data, and progressively more extreme filters were used while looking at the t-SNE and PCA graphs they produced to see if any grouping was visually apparent. A t-SNE plot is a plot designed to maintain proximity (though not distance) relations in high dimensional data in two dimensions while a PCA plot analyzes the two most important axes in the data distribution. Picking the top 32 genes produced clearly distinct distributions for the patient status groups in both the t-SNE and PCA plots.
+With low values indicating that the two distributions are similar or identical while high values indicate significant difference between the distribution means. These Z-test values were used to filter the data, and progressively more extreme filters were used while looking at the t-SNE and PCA graphs they produced to see if any grouping was visually apparent. A t-SNE plot is a plot designed to maintain proximity (though not distance) relations of high-dimensional data in two dimensions while a PCA plot analyzes the two most important axes in the data distribution. Picking the top 32 genes produced clearly distinct distributions for the patient status groups in both the t-SNE and PCA plots.
 
-Two models were made for each data set--a linear discriminant analysis model and a classification tree model. These models were chosen for their comprehensibility. Considering the minor actual predictive power of possible models because of the few patients in the datasets, comprehensibility was chosen as more important than accuracy so that the models could hopefully still provide some insight. Initially there was a great difference between the specificity and sensitivity in the models due to an imbalance in each dataset between the two patient status groups (for example, there was an approximately 1:5 ratio of controls to cases). A weighted training set was made adding enough synthetic rows to even the balance of the two status groups. These rows were made using using randomized combinations of gene observations from the minority status group in the training set. Using weighted training data fixed the major imbalance between the sensitivity and specificity of the models which was initially observed. After training the models, a Monte Carlo method was defined for carrying out the whole process, from calculating Z-test values to creating models, on random data and seeing how the models so derived compared in balanced accuracy to the models developed on the actual data.
+Two models were made for each data set--a linear discriminant analysis model and a classification tree model. These models were chosen for their comprehensibility. Considering the minor actual predictive power of possible models because of the few patients in the data sets, comprehensibility was chosen as more important than accuracy so that the models could hopefully still provide some insight. Initially, there was a great difference between the specificity and sensitivity in the models due to an imbalance in each data set between the two patient status groups (for example, there was an approximately 1:5 ratio of controls to cases). A weighted training set was made adding enough synthetic rows to even the balance of the two status groups. These rows were made using using randomized combinations of gene observations from the minority status group in the training set. Using weighted training data fixed the major imbalance between the sensitivity and specificity of the models which was initially observed. After training the models, a Monte Carlo method was defined for carrying out the whole process, from calculating Z-test values to creating models, on random data and seeing how the models so derived compared in balanced accuracy to the models developed on the actual data.
 
 ## Results
 
@@ -259,8 +255,8 @@ The linear discriminant analysis for the bulbar versus limb onset site data achi
 plot.bvl.jitter.lda
 ```
 
-Unfortunately, the classification tree models proved insignificant. The Monte Carlo analysis indicated a p-value of 62% for the classification tree made for the control versus case data, with the bulbar versus limb onset data performing similarly poorly. While more accurate methods, like random forest methods, could easily provide better accuracy, the failure of the classification tree models is dissapointing because of their potential to illuminate specifically which genes in what combination indicate patient status.
+Unfortunately, the classification tree models proved insignificant. The Monte Carlo analysis indicated a p-value of 62% for the classification tree made for the control versus case data, with the bulbar versus limb onset data performing similarly poorly. While more accurate methods, like random forest methods, could easily provide better accuracy, the failure of the classification tree models is disappointing because of their potential to illuminate specifically which genes in what combination indicate patient status.
 
 ## Conclusion
 
-This analysis successful demonstrated the liklihood of a systematic difference bewteen gene expression in control versus case patients and bulbar versus limb onset patients. It also successfully created linear discriminant analysis models to describe this difference. Unfortunately, it failed to create meaningful classification tree models. The biggest struggle with this project was time. The data had many columns which slowed analysis, and the author was only able to begin a few weeks before the analysis was due. The second biggest struggle was extracting significant results from data with few rows and many possible columns to cherry-pick correlations from. Thankfully, the linear discriminant analysis models held up to scrutiny. The next step in this analysis would be to take into account the differences in cell-type composition of the tissue samples and see if that has explanatory value towards gene expression. It remains to be shown from this data that the differences in gene expression analyzed were not, in fact, due to a structural difference in cell-composition of the tissue samples between the patient status groups. And, as always, more data would be nice. A dataset with significantly more patients could draw much stronger conclusions, and perhaps create statistically significant classification trees.
+This analysis successfully demonstrated the likelihood of a systematic difference between gene expression in control versus case patients and bulbar versus limb onset patients. It also successfully created linear discriminant analysis models to describe this difference. Unfortunately, it failed to create meaningful classification tree models. The biggest struggle with this project was time. The data had many columns which slowed analysis, and the author was only able to begin a few weeks before the analysis was due. The second biggest struggle was extracting significant results from data with few rows and many possible columns to cherry-pick correlations from. Thankfully, the linear discriminant analysis models held up to scrutiny. The next step in this analysis would be to take into account the differences in cell-type composition of the tissue samples and see if that has explanatory value towards gene expression. It remains to be shown from this data that the differences in gene expression analyzed were not, in fact, due to a structural difference in cell-composition of the tissue samples between the patient status groups. And, as always, more data would be nice. A data set with significantly more patients could draw much stronger conclusions, and perhaps create statistically significant classification trees.
